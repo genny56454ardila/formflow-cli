@@ -1,0 +1,9 @@
+# Javascript
+
+node_modules/
+
+yarn-error.log*
+.parcel-cache/
+build/
+.cache/
+dist/
