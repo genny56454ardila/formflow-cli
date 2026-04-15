@@ -43,6 +43,16 @@ describe('generateSchema', () => {
     expect(schema.version).toBe('1.0.0');
   });
 
+  it('should include a createdAt timestamp in the schema', () => {
+    const before = Date.now();
+    const schema = generateSchema(validConfig);
+    const after = Date.now();
+    expect(schema.createdAt).toBeDefined();
+    const ts = new Date(schema.createdAt).getTime();
+    expect(ts).toBeGreaterThanOrEqual(before);
+    expect(ts).toBeLessThanOrEqual(after);
+  });
+
   it('should throw if config is null or not an object', () => {
     expect(() => generateSchema(null)).toThrow('Config must be a non-null object');
     expect(() => generateSchema('string')).toThrow('Config must be a non-null object');
