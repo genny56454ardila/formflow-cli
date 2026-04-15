@@ -1,89 +1,89 @@
 const { renameField, renameSchema } = require('../../src/schema/renamer');
 
 describe('renameField', () => {
-  const baseFields = [
-    { name: 'email', type: 'email', required: true },
-    { name: 'username', type: 'text', required: true },
-    { name: 'age', type: 'number', required: false },
-  ];
+  const baseField = { name: 'firstName', label: 'firstName', type: 'text', required: true };
 
-  it('renames an existing field', () => {
-    const result = renameField(baseFields, 'email', 'emailAddress');
-    expect(result.find((f) => f.name === 'emailAddress')).toBeDefined();
-    expect(result.find((f) => f.name === 'email')).toBeUndefined();
+  it('renames the field when name is in the map', () => {
+    const result = renameField(baseField, { firstName: 'first_name' });
+    expect(result.name).toBe('first_name');
   });
 
-  it('preserves other field properties when renaming', () => {
-    const result = renameField(baseFields, 'email', 'emailAddress');
-    const renamed = result.find((f) => f.name === 'emailAddress');
-    expect(renamed.type).toBe('email');
-    expect(renamed.required).toBe(true);
+  it('updates label when it matches the old name', () => {
+    const result = renameField(baseField, { firstName: 'first_name' });
+    expect(result.label).toBe('first_name');
   });
 
-  it('does not mutate the original fields array', () => {
-    renameField(baseFields, 'age', 'userAge');
-    expect(baseFields.find((f) => f.name === 'age')).toBeDefined();
+  it('preserves custom label when it differs from name', () => {
+    const field = { ...baseField, label: 'First Name' };
+    const result = renameField(field, { firstName: 'first_name' });
+    expect(result.label).toBe('First Name');
   });
 
-  it('throws if fields is not an array', () => {
-    expect(() => renameField(null, 'email', 'emailAddress')).toThrow('fields must be an array');
+  it('returns unchanged field when name not in map', () => {
+    const result = renameField(baseField, { lastName: 'last_name' });
+    expect(result.name).toBe('firstName');
   });
 
-  it('throws if oldName does not exist', () => {
-    expect(() => renameField(baseFields, 'nonexistent', 'newName')).toThrow(
-      'Field "nonexistent" not found in schema'
-    );
+  it('preserves other field properties', () => {
+    const result = renameField(baseField, { firstName: 'first_name' });
+    expect(result.type).toBe('text');
+    expect(result.required).toBe(true);
   });
 
-  it('throws if newName already exists', () => {
-    expect(() => renameField(baseFields, 'email', 'username')).toThrow(
-      'Field "username" already exists in schema'
-    );
+  it('throws on invalid field', () => {
+    expect(() => renameField(null, {})).toThrow('Invalid field object');
   });
 
-  it('throws if oldName is empty', () => {
-    expect(() => renameField(baseFields, '', 'newName')).toThrow('oldName must be a non-empty string');
-  });
-
-  it('throws if newName is empty', () => {
-    expect(() => renameField(baseFields, 'email', '')).toThrow('newName must be a non-empty string');
+  it('throws on invalid name map', () => {
+    expect(() => renameField(baseField, null)).toThrow('Invalid name map');
   });
 });
 
 describe('renameSchema', () => {
-  const baseSchema = {
+  const schema = {
     name: 'UserForm',
     fields: [
-      { name: 'firstName', type: 'text', required: true },
-      { name: 'lastName', type: 'text', required: true },
+      { name: 'firstName', label: 'firstName', type: 'text' },
+      { name: 'lastName', label: 'Last Name', type: 'text' },
+      { name: 'email', label: 'Email', type: 'email' },
     ],
   };
 
-  it('renames a field in a schema object', () => {
-    const result = renameSchema(baseSchema, 'firstName', 'givenName');
-    expect(result.fields.find((f) => f.name === 'givenName')).toBeDefined();
-    expect(result.fields.find((f) => f.name === 'firstName')).toBeUndefined();
+  it('renames multiple fields', () => {
+    const { schema: result } = renameSchema(schema, { firstName: 'first_name', lastName: 'last_name' });
+    const names = result.fields.map((f) => f.name);
+    expect(names).toContain('first_name');
+    expect(names).toContain('last_name');
+    expect(names).toContain('email');
   });
 
-  it('preserves other schema properties', () => {
-    const result = renameSchema(baseSchema, 'firstName', 'givenName');
-    expect(result.name).toBe('UserForm');
+  it('returns empty conflicts array when no conflicts', () => {
+    const { conflicts } = renameSchema(schema, { firstName: 'first_name' });
+    expect(conflicts).toEqual([]);
   });
 
-  it('does not mutate the original schema', () => {
-    renameSchema(baseSchema, 'firstName', 'givenName');
-    expect(baseSchema.fields.find((f) => f.name === 'firstName')).toBeDefined();
+  it('detects conflicts when target name already exists', () => {
+    const { conflicts } = renameSchema(schema, { firstName: 'email' });
+    expect(conflicts.length).toBeGreaterThan(0);
+    expect(conflicts[0].from).toBe('firstName');
+    expect(conflicts[0].to).toBe('email');
   });
 
-  it('throws if schema has no fields array', () => {
-    expect(() => renameSchema({ name: 'Empty' }, 'a', 'b')).toThrow(
-      'Schema must have a fields array'
-    );
+  it('excludes conflicting fields from result', () => {
+    const { schema: result } = renameSchema(schema, { firstName: 'email' });
+    const names = result.fields.map((f) => f.name);
+    expect(names.filter((n) => n === 'email').length).toBe(1);
   });
 
-  it('throws if schemaOrPath is invalid type', () => {
-    expect(() => renameSchema(42, 'a', 'b')).toThrow(
-      'schemaOrPath must be a file path string or schema object'
-    );
+  it('throws on invalid schema', () => {
+    expect(() => renameSchema(null, {})).toThrow('Invalid schema object');
+  });
+
+  it('throws when fields is not an array', () => {
+    expect(() => renameSchema({ name: 'x' }, {})).toThrow('Schema must have a fields array');
+  });
+
+  it('throws on invalid name map', () => {
+    expect(() => renameSchema(schema, null)).toThrow('Invalid name map');
   });
 });
