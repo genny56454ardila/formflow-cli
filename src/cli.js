@@ -1,54 +1,90 @@
 #!/usr/bin/env node
+/**
+ * cli.js — Entry point for formflow-cli
+ */
 
-const { program } = require('commander');
+const yargs = require('yargs/yargs');
+const { hideBin } = require('yargs/helpers');
+
 const { runExport } = require('./commands/export');
-const { resolveInputPath: validateInput, runValidate } = require('./commands/validate');
-const { buildSchemaConfig, runScaffold } = require('./commands/scaffold');
-const { printDiff, runDiff } = require('./commands/diff');
-const { runMerge } = require('./commands/merge');
-const { runLint } = require('./commands/lint');
-const pkg = require('../package.json');
+const { runSort } = require('./commands/sort');
 
-program
-  .name('formflow')
-  .description('Scaffold and validate web form schemas from JSON config files')
-  .version(pkg.version || '0.1.0');
+yargs(hideBin(process.argv))
+  .scriptName('formflow')
+  .usage('$0 <command> [options]')
 
-program
-  .command('validate <input>')
-  .description('Validate a form schema JSON file')
-  .action((input) => runValidate(input));
+  .command(
+    'validate <input>',
+    'Validate a form schema JSON file',
+    (yargs) => yargs.positional('input', { describe: 'Path to schema file', type: 'string' }),
+    (argv) => require('./commands/validate').resolveInputPath(argv.input)
+  )
 
-program
-  .command('scaffold <output>')
-  .description('Scaffold a new form schema JSON file')
-  .option('-n, --name <name>', 'Schema name', 'MyForm')
-  .option('-f, --fields <fields>', 'Comma-separated field ids', 'field1,field2')
-  .action((output, opts) => runScaffold(output, opts));
+  .command(
+    'scaffold',
+    'Scaffold a new form schema',
+    (yargs) => yargs
+      .option('name', { type: 'string', demandOption: true, describe: 'Schema name' })
+      .option('fields', { type: 'string', describe: 'Comma-separated field names' }),
+    (argv) => require('./commands/scaffold').buildSchemaConfig(argv)
+  )
 
-program
-  .command('export <input>')
-  .description('Export a form schema to HTML, Markdown, or JSON')
-  .option('-f, --format <format>', 'Output format: json | html | markdown', 'json')
-  .option('-o, --output <path>', 'Output file path')
-  .action((input, opts) => runExport(input, opts));
+  .command(
+    'export <input>',
+    'Export a schema to JSON, HTML, or Markdown',
+    (yargs) => yargs
+      .positional('input', { describe: 'Path to schema file', type: 'string' })
+      .option('format', { type: 'string', default: 'json', describe: 'Output format: json|html|md' })
+      .option('output', { type: 'string', describe: 'Output file path' }),
+    (argv) => runExport(argv)
+  )
 
-program
-  .command('diff <schemaA> <schemaB>')
-  .description('Show differences between two form schemas')
-  .action((a, b) => runDiff(a, b));
+  .command(
+    'diff <a> <b>',
+    'Diff two schema files',
+    (yargs) => yargs
+      .positional('a', { type: 'string' })
+      .positional('b', { type: 'string' }),
+    (argv) => require('./commands/diff').printDiff(argv)
+  )
 
-program
-  .command('merge <schemaA> <schemaB>')
-  .description('Merge two form schemas')
-  .option('-o, --output <path>', 'Output file path')
-  .action((a, b, opts) => runMerge(a, b, opts));
+  .command(
+    'merge <base> <other>',
+    'Merge two schema files',
+    (yargs) => yargs
+      .positional('base', { type: 'string' })
+      .positional('other', { type: 'string' })
+      .option('output', { type: 'string', describe: 'Output file path' }),
+    (argv) => require('./commands/merge').resolveInputPath(argv.base)
+  )
 
-program
-  .command('lint <input>')
-  .description('Lint a form schema for style and best-practice issues')
-  .option('-s, --strict', 'Exit with error code if warnings are found')
-  .option('-f, --format <format>', 'Output format: text | json', 'text')
-  .action((input, opts) => runLint(input, opts));
+  .command(
+    'lint <input>',
+    'Lint a schema file for style issues',
+    (yargs) => yargs.positional('input', { type: 'string' }),
+    (argv) => require('./commands/lint').resolveInputPath(argv.input)
+  )
 
-program.parseAsync(process.argv);
+  .command(
+    'snapshot <input>',
+    'Save or compare a schema snapshot',
+    (yargs) => yargs
+      .positional('input', { type: 'string' })
+      .option('name', { type: 'string', describe: 'Snapshot name' }),
+    (argv) => require('./commands/snapshot').resolveInputPath(argv.input)
+  )
+
+  .command(
+    'sort <input>',
+    'Sort schema fields by a given key',
+    (yargs) => yargs
+      .positional('input', { describe: 'Path to schema file', type: 'string' })
+      .option('key', { type: 'string', default: 'name', describe: 'Field to sort by: name|type|required|label' })
+      .option('order', { type: 'string', default: 'asc', describe: 'Sort order: asc|desc' })
+      .option('output', { type: 'string', describe: 'Output file path' }),
+    (argv) => runSort(argv)
+  )
+
+  .demandCommand(1, 'Please specify a command.')
+  .help()
+  .argv;
