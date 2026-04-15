@@ -1,65 +1,54 @@
 #!/usr/bin/env node
-'use strict';
 
 const { program } = require('commander');
 const { runExport } = require('./commands/export');
-const { runValidate } = require('./commands/validate');
-const { runScaffold } = require('./commands/scaffold');
-const { version } = require('../package.json');
+const { resolveInputPath: validateInput, runValidate } = require('./commands/validate');
+const { buildSchemaConfig, runScaffold } = require('./commands/scaffold');
+const { printDiff, runDiff } = require('./commands/diff');
+const { runMerge } = require('./commands/merge');
+const { runLint } = require('./commands/lint');
+const pkg = require('../package.json');
 
 program
   .name('formflow')
   .description('Scaffold and validate web form schemas from JSON config files')
-  .version(version);
+  .version(pkg.version || '0.1.0');
 
 program
-  .command('validate <schema>')
+  .command('validate <input>')
   .description('Validate a form schema JSON file')
-  .option('-v, --verbose', 'print full schema on success')
-  .option('-q, --quiet', 'suppress all output')
-  .action(async (schema, options) => {
-    try {
-      const { valid } = await runValidate(schema, options);
-      process.exitCode = valid ? 0 : 1;
-    } catch (err) {
-      console.error(`Error: ${err.message}`);
-      process.exitCode = 1;
-    }
-  });
+  .action((input) => runValidate(input));
 
 program
-  .command('scaffold <id> [output]')
-  .description('Generate a new form schema JSON file')
-  .option('-f, --fields <fields...>', 'field definitions in name:type format')
-  .option('--overwrite', 'overwrite output file if it already exists')
-  .option('-q, --quiet', 'suppress all output')
-  .action(async (id, output, options) => {
-    try {
-      await runScaffold(id, output, options);
-    } catch (err) {
-      console.error(`Error: ${err.message}`);
-      process.exitCode = 1;
-    }
-  });
+  .command('scaffold <output>')
+  .description('Scaffold a new form schema JSON file')
+  .option('-n, --name <name>', 'Schema name', 'MyForm')
+  .option('-f, --fields <fields>', 'Comma-separated field ids', 'field1,field2')
+  .action((output, opts) => runScaffold(output, opts));
 
 program
-  .command('export <schema> [output]')
+  .command('export <input>')
   .description('Export a form schema to HTML, Markdown, or JSON')
-  .option('-f, --format <format>', 'output format: json | html | markdown', 'json')
-  .option('-q, --quiet', 'suppress all output')
-  .action(async (schema, output, options) => {
-    try {
-      const VALID_FORMATS = ['json', 'html', 'markdown'];
-      if (!VALID_FORMATS.includes(options.format)) {
-        console.error(`Error: Invalid format "${options.format}". Must be one of: ${VALID_FORMATS.join(', ')}`);
-        process.exitCode = 1;
-        return;
-      }
-      await runExport(schema, output, options);
-    } catch (err) {
-      console.error(`Error: ${err.message}`);
-      process.exitCode = 1;
-    }
-  });
+  .option('-f, --format <format>', 'Output format: json | html | markdown', 'json')
+  .option('-o, --output <path>', 'Output file path')
+  .action((input, opts) => runExport(input, opts));
 
-program.parse(process.argv);
+program
+  .command('diff <schemaA> <schemaB>')
+  .description('Show differences between two form schemas')
+  .action((a, b) => runDiff(a, b));
+
+program
+  .command('merge <schemaA> <schemaB>')
+  .description('Merge two form schemas')
+  .option('-o, --output <path>', 'Output file path')
+  .action((a, b, opts) => runMerge(a, b, opts));
+
+program
+  .command('lint <input>')
+  .description('Lint a form schema for style and best-practice issues')
+  .option('-s, --strict', 'Exit with error code if warnings are found')
+  .option('-f, --format <format>', 'Output format: text | json', 'text')
+  .action((input, opts) => runLint(input, opts));
+
+program.parseAsync(process.argv);
