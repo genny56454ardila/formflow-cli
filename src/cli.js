@@ -49,6 +49,12 @@ program
   .option('-q, --quiet', 'suppress all output')
   .action(async (schema, output, options) => {
     try {
+      const VALID_FORMATS = ['json', 'html', 'markdown'];
+      if (!VALID_FORMATS.includes(options.format)) {
+        console.error(`Error: Invalid format "${options.format}". Must be one of: ${VALID_FORMATS.join(', ')}`);
+        process.exitCode = 1;
+        return;
+      }
       await runExport(schema, output, options);
     } catch (err) {
       console.error(`Error: ${err.message}`);
