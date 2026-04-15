@@ -27,8 +27,18 @@ describe('resolveInputPath', () => {
     expect(path.isAbsolute(result)).toBe(true);
   });
 
+  test('returns the same path when input is already absolute', () => {
+    const absolutePath = path.resolve('/tmp/schema.json');
+    const result = resolveInputPath(absolutePath);
+    expect(result).toBe(absolutePath);
+  });
+
   test('throws when input is missing', () => {
     expect(() => resolveInputPath(undefined)).toThrow();
+  });
+
+  test('throws when input is an empty string', () => {
+    expect(() => resolveInputPath('')).toThrow();
   });
 });
 
