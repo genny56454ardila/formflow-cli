@@ -56,4 +56,23 @@ function lintSchema(schema) {
   return warnings;
 }
 
-module.exports = { lintField, lintSchema, LINT_RULES };
+/**
+ * Formats lint warnings into a human-readable string summary.
+ * Useful for CLI output or logging.
+ *
+ * @param {Array} warnings - Array of warning objects returned by lintSchema
+ * @returns {string} Formatted summary string
+ */
+function formatLintWarnings(warnings) {
+  if (!warnings || warnings.length === 0) {
+    return 'No lint warnings found.';
+  }
+
+  const lines = warnings.map(
+    (w, i) => `  ${i + 1}. [${w.rule}]${w.field ? ` (${w.field})` : ''} ${w.message}`
+  );
+
+  return `Found ${warnings.length} lint warning(s):\n${lines.join('\n')}`;
+}
+
+module.exports = { lintField, lintSchema, formatLintWarnings, LINT_RULES };
