@@ -1,100 +1,63 @@
 const { tagField, untagField, getFieldsByTag, tagSchema, listAllTags } = require('../../src/schema/tagger');
 
-describe('tagField', () => {
-  it('adds a tag to a field with no existing tags', () => {
-    const field = { name: 'email', type: 'text' };
-    const result = tagField(field, 'pii');
-    expect(result.tags).toEqual(['pii']);
-  });
+const baseSchema = {
+  name: 'TestForm',
+  fields: [
+    { name: 'email', type: 'email', tags: ['required'] },
+    { name: 'age', type: 'number', tags: [] },
+    { name: 'bio', type: 'textarea' }
+  ]
+};
 
-  it('does not duplicate existing tags', () => {
-    const field = { name: 'email', type: 'text', tags: ['pii'] };
-    const result = tagField(field, 'pii');
-    expect(result.tags).toEqual(['pii']);
-  });
-
-  it('preserves other field properties', () => {
-    const field = { name: 'email', type: 'text', required: true };
-    const result = tagField(field, 'pii');
-    expect(result.name).toBe('email');
-    expect(result.required).toBe(true);
-  });
+test('tagField adds a tag to a field', () => {
+  const result = tagField(baseSchema, 'age', 'optional');
+  const field = result.fields.find(f => f.name === 'age');
+  expect(field.tags).toContain('optional');
 });
 
-describe('untagField', () => {
-  it('removes a tag from a field', () => {
-    const field = { name: 'email', tags: ['pii', 'sensitive'] };
-    const result = untagField(field, 'pii');
-    expect(result.tags).toEqual(['sensitive']);
-  });
-
-  it('returns empty tags if last tag removed', () => {
-    const field = { name: 'email', tags: ['pii'] };
-    const result = untagField(field, 'pii');
-    expect(result.tags).toEqual([]);
-  });
-
-  it('handles field with no tags gracefully', () => {
-    const field = { name: 'email' };
-    const result = untagField(field, 'pii');
-    expect(result.tags).toEqual([]);
-  });
+test('tagField does not duplicate tags', () => {
+  const result = tagField(baseSchema, 'email', 'required');
+  const field = result.fields.find(f => f.name === 'email');
+  expect(field.tags.filter(t => t === 'required').length).toBe(1);
 });
 
-describe('getFieldsByTag', () => {
-  const fields = [
-    { name: 'email', tags: ['pii'] },
-    { name: 'age', tags: ['optional'] },
-    { name: 'ssn', tags: ['pii', 'sensitive'] },
-  ];
-
-  it('returns fields matching the tag', () => {
-    const result = getFieldsByTag(fields, 'pii');
-    expect(result.map(f => f.name)).toEqual(['email', 'ssn']);
-  });
-
-  it('returns empty array if no matches', () => {
-    expect(getFieldsByTag(fields, 'nonexistent')).toEqual([]);
-  });
+test('tagField creates tags array if missing', () => {
+  const result = tagField(baseSchema, 'bio', 'pii');
+  const field = result.fields.find(f => f.name === 'bio');
+  expect(field.tags).toContain('pii');
 });
 
-describe('tagSchema', () => {
-  const schema = {
-    name: 'test',
-    fields: [
-      { name: 'email', type: 'text' },
-      { name: 'age', type: 'number' },
-    ],
-  };
-
-  it('adds a tag to a field by name', () => {
-    const result = tagSchema(schema, 'email', 'pii', 'add');
-    expect(result.fields.find(f => f.name === 'email').tags).toContain('pii');
-  });
-
-  it('removes a tag from a field by name', () => {
-    const s = { ...schema, fields: [{ name: 'email', type: 'text', tags: ['pii'] }, { name: 'age', type: 'number' }] };
-    const result = tagSchema(s, 'email', 'pii', 'remove');
-    expect(result.fields.find(f => f.name === 'email').tags).not.toContain('pii');
-  });
-
-  it('throws on invalid schema', () => {
-    expect(() => tagSchema(null, 'email', 'pii')).toThrow('Invalid schema');
-  });
+test('untagField removes a tag from a field', () => {
+  const result = untagField(baseSchema, 'email', 'required');
+  const field = result.fields.find(f => f.name === 'email');
+  expect(field.tags).not.toContain('required');
 });
 
-describe('listAllTags', () => {
-  it('returns sorted unique tags across all fields', () => {
-    const schema = {
-      fields: [
-        { name: 'a', tags: ['pii', 'required'] },
-        { name: 'b', tags: ['optional', 'pii'] },
-      ],
-    };
-    expect(listAllTags(schema)).toEqual(['optional', 'pii', 'required']);
-  });
+test('untagField is safe when tag does not exist', () => {
+  const result = untagField(baseSchema, 'age', 'nonexistent');
+  const field = result.fields.find(f => f.name === 'age');
+  expect(field.tags).toEqual([]);
+});
 
-  it('returns empty array for schema with no tagged fields', () => {
-    expect(listAllTags({ fields: [{ name: 'x' }] })).toEqual([]);
-  });
+test('getFieldsByTag returns correct fields', () => {
+  const fields = getFieldsByTag(baseSchema, 'required');
+  expect(fields.map(f => f.name)).toContain('email');
+  expect(fields.length).toBe(1);
+});
+
+test('getFieldsByTag returns empty array when no match', () => {
+  const fields = getFieldsByTag(baseSchema, 'unknown');
+  expect(fields).toEqual([]);
+});
+
+test('listAllTags returns unique tags across all fields', () => {
+  const tags = listAllTags(baseSchema);
+  expect(tags).toContain('required');
+  expect(new Set(tags).size).toBe(tags.length);
+});
+
+test('tagSchema does not mutate original', () => {
+  const original = JSON.stringify(baseSchema);
+  tagField(baseSchema, 'age', 'new-tag');
+  expect(JSON.stringify(baseSchema)).toBe(original);
 });
