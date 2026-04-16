@@ -1,57 +1,43 @@
 const path = require('path');
 const fs = require('fs');
 const { loadSchema } = require('../schema/loader');
-const { tagField, untagField, getFieldsByTag, listAllTags, tagSchema } = require('../schema/tagger');
+const { tagSchema, untagSchema, listTags } = require('../schema/tagger');
 
 function resolveInputPath(input) {
   return path.isAbsolute(input) ? input : path.resolve(process.cwd(), input);
 }
 
-async function runTag(filePath, options) {
-  const resolved = resolveInputPath(filePath);
-  const schema = await loadSchema(resolved);
+async function runTag(options) {
+  const { input, field, add, remove, list, output } = options;
+  const inputPath = resolveInputPath(input);
+  let schema = await loadSchema(inputPath);
 
-  if (options.list) {
-    const tags = listAllTags(schema);
+  if (list) {
+    const tags = listTags(schema);
     if (tags.length === 0) {
       console.log('No tags found in schema.');
     } else {
-      console.log('Tags found:', tags.join(', '));
+      console.log('Tags:', tags.join(', '));
     }
     return;
   }
 
-  if (options.filter) {
-    const fields = getFieldsByTag(schema, options.filter);
-    if (fields.length === 0) {
-      console.log(`No fields with tag "${options.filter}".`);
-    } else {
-      console.log(`Fields tagged "${options.filter}":`);
-      fields.forEach(f => console.log(` - ${f.name}`));
-    }
-    return;
-  }
-
-  if (!options.field) {
-    console.error('Error: --field is required for tag/untag operations.');
+  if (!field) {
+    console.error('Error: --field is required for add/remove operations.');
     process.exit(1);
   }
 
-  if (!options.tag) {
-    console.error('Error: --tag value is required.');
-    process.exit(1);
+  if (add && add.length > 0) {
+    schema = tagSchema(schema, field, add);
   }
 
-  let updated;
-  if (options.remove) {
-    updated = untagField(schema, options.field, options.tag);
-    console.log(`Removed tag "${options.tag}" from field "${options.field}".`);
-  } else {
-    updated = tagField(schema, options.field, options.tag);
-    console.log(`Tagged field "${options.field}" with "${options.tag}".`);
+  if (remove && remove.length > 0) {
+    schema = untagSchema(schema, field, remove);
   }
 
-  fs.writeFileSync(resolved, JSON.stringify(updated, null, 2));
+  const outPath = output ? resolveInputPath(output) : inputPath;
+  fs.writeFileSync(outPath, JSON.stringify(schema, null, 2));
+  console.log(`Schema tags updated: ${outPath}`);
 }
 
 module.exports = { resolveInputPath, runTag };
