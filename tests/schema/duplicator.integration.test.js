@@ -51,4 +51,11 @@ describe('duplicateSchemaField (integration)', () => {
       duplicateSchemaField(schemaPath, 'email', 'password')
     ).rejects.toThrow('Field "password" already exists');
   });
+
+  it('does not mutate the original schema file on disk', async () => {
+    await duplicateSchemaField(schemaPath, 'email', 'email_backup');
+    const onDisk = JSON.parse(fs.readFileSync(schemaPath, 'utf8'));
+    expect(onDisk.fields.length).toBe(3);
+    expect(onDisk.fields.some((f) => f.name === 'email_backup')).toBe(false);
+  });
 });
