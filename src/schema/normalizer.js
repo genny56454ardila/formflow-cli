@@ -47,13 +47,27 @@ function normalizeField(field) {
 }
 
 function normalizeSchema(schema) {
-  if (!schema || !Array.isArray(schema.fields)) {
+  if (!schema || typeof schema !== 'object') {
+    throw new Error('Schema must be an object');
+  }
+
+  if (!Array.isArray(schema.fields)) {
     throw new Error('Schema must have a fields array');
+  }
+
+  if (schema.fields.length === 0) {
+    throw new Error('Schema fields array must not be empty');
   }
 
   return {
     ...schema,
-    fields: schema.fields.map(normalizeField),
+    fields: schema.fields.map((field, index) => {
+      try {
+        return normalizeField(field);
+      } catch (err) {
+        throw new Error(`Invalid field at index ${index}: ${err.message}`);
+      }
+    }),
   };
 }
 
