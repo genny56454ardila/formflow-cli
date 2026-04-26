@@ -31,6 +31,13 @@ describe('highlightField', () => {
     expect(result.required).toBe(true);
     expect(result.min).toBe(1);
   });
+
+  it('highlights term in label when it matches', () => {
+    const field = { name: 'email', type: 'text', label: 'Email Address' };
+    const result = highlightField(field, 'Address');
+    expect(stripAnsi(result.label)).toBe('Email Address');
+    expect(result.label).not.toBe('Email Address'); // has ansi codes
+  });
 });
 
 describe('highlightSchema', () => {
@@ -55,6 +62,12 @@ describe('highlightSchema', () => {
     const result = highlightSchema(baseSchema, 'email');
     const ageField = result.fields.find((f) => stripAnsi(f.name) === 'age');
     expect(ageField.name).toBe('age');
+  });
+
+  it('does not mutate the original schema', () => {
+    const original = JSON.parse(JSON.stringify(baseSchema));
+    highlightSchema(baseSchema, 'email');
+    expect(baseSchema).toEqual(original);
   });
 });
 
